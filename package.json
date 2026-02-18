@@ -1,0 +1,24 @@
+{
+  "name": "erm-rent-system",
+  "version": "1.0.0",
+  "description": "ERP система для управления коммерческой недвижимостью",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "release": "npm run build && node scripts/copy-frontend.js",
+    "copy-frontend": "node scripts/copy-frontend.js",
+    "start": "npm run start --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

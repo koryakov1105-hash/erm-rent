@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.DS_Store
+*.db
+*.db-journal
+backend/database/data.json
+backend/data/
+backend/dist/
+backend/backend/
+Kvadrat/
+.vscode/
+.idea/
+coverage/
