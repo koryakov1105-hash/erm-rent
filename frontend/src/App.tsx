@@ -24,7 +24,10 @@ function AuthScreen() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>🏢 ERP квадрат</h1>
+        <h1>
+          <span className="auth-logo-square" aria-hidden="true" />
+          <span>ERP квадрат</span>
+        </h1>
         <p className="auth-subtitle">
           Система управления коммерческой недвижимостью. Зарегистрируйте первый аккаунт или войдите в существующий.
         </p>
@@ -83,7 +86,7 @@ function AppLayout() {
       <aside className={`sidebar ${isCollapsed && !isMobile ? 'collapsed' : ''} ${isMobileOpen ? 'sidebar-mobile-open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" className="sidebar-brand">
-            <span className="sidebar-brand-icon">🏢</span>
+            <span className="sidebar-brand-icon app-logo-square" aria-hidden="true" />
             {!isCollapsed && <span className="sidebar-brand-text">ERP квадрат</span>}
           </Link>
           <button
