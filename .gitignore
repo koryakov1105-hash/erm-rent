@@ -9,6 +9,7 @@ build/
 backend/database/data.json
 backend/data/
 backend/dist/
+backend/public/
 backend/backend/
 Kvadrat/
 .vscode/

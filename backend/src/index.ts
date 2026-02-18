@@ -55,6 +55,17 @@ app.use('/api/invoices', invoicesRoutes);
 const publicDir = path.join(__dirname, '..', 'public');
 const hasPublic = fs.existsSync(publicDir);
 
+// Убираем 404 для favicon.ico: отдаём favicon.svg с нужным типом
+app.get('/favicon.ico', (req, res) => {
+  const svgPath = path.join(publicDir, 'favicon.svg');
+  if (hasPublic && fs.existsSync(svgPath)) {
+    res.type('image/svg+xml');
+    res.sendFile(svgPath);
+  } else {
+    res.status(204).end();
+  }
+});
+
 if (process.env.NODE_ENV === 'production' && hasPublic) {
   app.use(express.static(publicDir));
   app.get('*', (req, res, next) => {

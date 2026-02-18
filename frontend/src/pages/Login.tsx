@@ -19,13 +19,16 @@ function Login() {
       navigate('/', { replace: true });
     } catch (err: any) {
       if (!err.response) {
-        setError('Сервер недоступен. Запустите бэкенд (в папке backend: npm run dev).');
+        setError('Сервер недоступен. Проверьте подключение к интернету и что приложение развёрнуто.');
         return;
       }
       const data = err.response?.data;
       const msg = data?.error || 'Ошибка входа';
       const detail = data?.detail;
-      setError(detail ? `${msg}: ${detail}` : msg);
+      const is401 = err.response?.status === 401;
+      const baseMsg = detail ? `${msg}: ${detail}` : msg;
+      const hint401 = ' Если вы только что обновили приложение на хостинге, данные могли сброситься — попробуйте зарегистрироваться снова.';
+      setError(is401 ? baseMsg + hint401 : baseMsg);
     } finally {
       setSubmitting(false);
     }
