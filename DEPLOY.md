@@ -22,7 +22,7 @@
    - **Name:** `erm-rent-api` (или любое).
    - **Root Directory:** `backend`.
    - **Runtime:** Node.
-   - **Build Command:** `npm install && npm run build`
+   - **Build Command:** `npm install --include=dev && npm run build`
    - **Start Command:** `npm start`
    - **Plan:** Free.
 5. В **Environment** добавьте при необходимости:
@@ -40,7 +40,7 @@
 3. Настройки:
    - **Name:** `erm-rent-app`
    - **Root Directory:** `frontend`
-   - **Build Command:** `npm install && npm run build`
+   - **Build Command:** `npm install --include=dev && npm run build`
    - **Publish Directory:** `dist`
 4. В **Environment** добавьте переменную:
    - **Key:** `VITE_API_URL`
