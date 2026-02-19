@@ -31,8 +31,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((err) => {
-        console.error('Auth check failed:', err);
-        setAuthToken(null);
+        // Не логируем ошибку в консоль, если это просто невалидный токен при первой загрузке
+        // Это нормальная ситуация (токен мог истечь или база данных сбросилась)
+        if (err.response?.status === 401) {
+          // Тихо очищаем токен, не показывая ошибку пользователю
+          setAuthToken(null);
+        } else {
+          console.error('Auth check failed:', err);
+          setAuthToken(null);
+        }
       })
       .finally(() => {
         setLoading(false);

@@ -170,12 +170,27 @@ router.get('/me', (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
-    const users = dbAll('users');
-    const user = users.find((u: any) => u.id === decoded.userId);
+    let decoded: { userId: number };
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    } catch (err) {
+      // Токен невалидный или истёкший - это нормально, не логируем как ошибку
+      return res.status(401).json({ error: 'Недействительный или истёкший токен' });
+    }
+
+    let users: any[];
+    try {
+      users = dbAll('users');
+    } catch (e) {
+      console.error('dbAll users failed in /me:', e);
+      return res.status(500).json({ error: 'Ошибка чтения данных' });
+    }
+
+    const user = users.find((u: any) => u && u.id === decoded.userId);
 
     if (!user) {
-      return res.status(401).json({ error: 'Пользователь не найден' });
+      // Пользователь не найден - возможно, база данных была сброшена
+      return res.status(401).json({ error: 'Пользователь не найден. Возможно, данные были сброшены.' });
     }
 
     res.json({
@@ -184,8 +199,10 @@ router.get('/me', (req: Request, res: Response) => {
       name: user.name,
       is_first: user.is_first
     });
-  } catch {
-    return res.status(401).json({ error: 'Недействительный токен' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Unexpected error in /auth/me:', message);
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 

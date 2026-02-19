@@ -27,7 +27,7 @@ function Login() {
       const detail = data?.detail;
       const is401 = err.response?.status === 401;
       const baseMsg = detail ? `${msg}: ${detail}` : msg;
-      const hint401 = ' Если вы только что обновили приложение на хостинге, данные могли сброситься — попробуйте зарегистрироваться снова.';
+      const hint401 = ' Если вы только что обновили приложение на хостинге или это первый запуск после деплоя, данные могли сброситься — попробуйте зарегистрироваться снова.';
       setError(is401 ? baseMsg + hint401 : baseMsg);
     } finally {
       setSubmitting(false);
