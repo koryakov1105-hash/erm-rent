@@ -47,7 +47,14 @@
    - **Value:** `https://ВАШ-БЭКЕНД-URL.onrender.com/api`  
      (подставьте ваш URL из шага 2, в конце обязательно `/api`).
 5. **Create Static Site**. Дождитесь сборки.
-6. Скопируйте **URL сайта**, например: `https://erm-rent-app.onrender.com` — **эту ссылку и нужно скидывать первым пользователям.**
+6. **Обязательно настройте Rewrite для SPA** (иначе прямые ссылки вроде `/register` или `/login` дадут 404):
+   - В Render откройте ваш **Static Site** → вкладка **Redirects/Rewrites**.
+   - Добавьте правило:
+     - **Source Path:** `/*`
+     - **Destination Path:** `/index.html`
+     - **Action:** **Rewrite** (не Redirect).
+   - Сохраните. Это нужно один раз; без этого при переходе по ссылке на `https://ваш-сайт.onrender.com/register` сервер вернёт 404.
+7. Скопируйте **URL сайта**, например: `https://erm-rent-app.onrender.com` — **эту ссылку и нужно скидывать первым пользователям.**
 
 Пользователи открывают ссылку, регистрируются и тестируют систему.
 
@@ -101,5 +108,6 @@
 - [ ] Код в GitHub.
 - [ ] Render: Web Service (backend), скопирован URL API.
 - [ ] Render Static Site или Vercel: фронтенд с переменной `VITE_API_URL` = `https://...onrender.com/api`.
+- [ ] **Render Static Site: в Redirects/Rewrites добавлено правило `/*` → `/index.html` (Rewrite)** — иначе /register и /login дают 404.
 - [ ] Открыта ссылка на фронтенд, проверены регистрация и вход.
 - [ ] Ссылка отправлена тестерам.
