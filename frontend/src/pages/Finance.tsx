@@ -7,12 +7,14 @@ import {
   tenantPaymentsApi,
   tenantsApi,
   leasesApi,
+  bankAccountsApi,
   Transaction,
   Unit,
   Property,
   TenantPayment,
   Tenant,
   Lease,
+  BankAccount,
   CalendarResponse,
   CalendarItem,
 } from '../services/api';
@@ -32,11 +34,14 @@ function Finance() {
   const [filterType, setFilterType] = useState<string>('');
   const [filterPlanned, setFilterPlanned] = useState<string>('');
   const [filterPropertyId, setFilterPropertyId] = useState<string>('');
+  const [filterBankAccountId, setFilterBankAccountId] = useState<string>('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [formData, setFormData] = useState({
     unit_id: '',
     property_id: '',
+    bank_account_id: '',
     type: 'income' as 'income' | 'expense',
     category: '',
     category_detail: '',
@@ -103,6 +108,16 @@ function Finance() {
     }
   };
 
+  const loadBankAccounts = async () => {
+    try {
+      const res = await bankAccountsApi.getAll();
+      setBankAccounts(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error('Error loading bank accounts:', e);
+      setBankAccounts([]);
+    }
+  };
+
   const loadTransactions = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -111,6 +126,7 @@ function Finance() {
       if (filterPlanned === 'plan') params.is_planned = true;
       if (filterPlanned === 'actual') params.is_planned = false;
       if (filterPropertyId) params.property_id = parseInt(filterPropertyId);
+      if (filterBankAccountId) params.bank_account_id = parseInt(filterBankAccountId);
       if (filterStartDate) params.start_date = filterStartDate;
       if (filterEndDate) params.end_date = filterEndDate;
       const res = await transactionsApi.getAll(params);
@@ -130,11 +146,12 @@ function Finance() {
     loadTenantPayments();
     loadTenants();
     loadLeases();
+    loadBankAccounts();
   }, []);
 
   useEffect(() => {
     loadTransactions();
-  }, [filterType, filterPlanned, filterPropertyId, filterStartDate, filterEndDate]);
+  }, [filterType, filterPlanned, filterPropertyId, filterBankAccountId, filterStartDate, filterEndDate]);
 
   const loadCalendar = async () => {
     const match = String(calendarMonth || '').match(/^(\d{4})-(\d{1,2})$/);
@@ -190,6 +207,7 @@ function Finance() {
       setFormData({
         unit_id: transaction.unit_id ? String(transaction.unit_id) : '',
         property_id: transaction.property_id ? String(transaction.property_id) : '',
+        bank_account_id: transaction.bank_account_id != null ? String(transaction.bank_account_id) : '',
         type: transaction.type,
         category: transaction.category || '',
         category_detail: transaction.category_detail || '',
@@ -207,6 +225,7 @@ function Finance() {
       setFormData({
         unit_id: '',
         property_id: '',
+        bank_account_id: '',
         type: 'income',
         category: '',
         category_detail: '',
@@ -237,6 +256,7 @@ function Finance() {
       const payload: Record<string, unknown> = {
         unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
         property_id: formData.property_id ? parseInt(formData.property_id) : null,
+        bank_account_id: formData.bank_account_id ? parseInt(formData.bank_account_id) : null,
         type: formData.type,
         category: formData.category || undefined,
         category_detail: formData.category_detail || undefined,
@@ -598,6 +618,19 @@ function Finance() {
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Банк. счёт</label>
+            <select
+              className="form-input finance-filter-input"
+              value={filterBankAccountId}
+              onChange={(e) => setFilterBankAccountId(e.target.value)}
+            >
+              <option value="">Все счета</option>
+              {bankAccounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name} — {a.account_number}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">С</label>
             <input
               type="date"
@@ -650,6 +683,7 @@ function Finance() {
                 <th>От кого / Кому</th>
                 <th>Объект</th>
                 <th>Юнит</th>
+                <th>Счёт</th>
                 <th>Статус</th>
                 <th>Описание</th>
                 <th>План/Факт</th>
@@ -676,6 +710,7 @@ function Finance() {
                   <td className="finance-cell-payer">{t.payer || '—'}</td>
                   <td className="finance-cell-property">{t.property_name || '—'}</td>
                   <td className="finance-cell-unit">{t.unit_number || '—'}</td>
+                  <td className="finance-cell-bank-account">{t.bank_account_name || t.bank_account_number || '—'}</td>
                   <td style={{ whiteSpace: 'normal', maxWidth: '140px' }}>
                     {String(t?.status) === 'deferred' ? (
                       <span className="status-badge" style={{ background: '#e8e0f0', color: '#4a148c', whiteSpace: 'normal', display: 'inline-block', wordBreak: 'break-word' }}>
@@ -838,6 +873,19 @@ function Finance() {
                     <option key={u.id} value={u.id}>
                       {u.property_name || ''} — {u.unit_number} ({u.area} м²)
                     </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Банковский счёт</label>
+                <select
+                  className="form-input"
+                  value={formData.bank_account_id}
+                  onChange={(e) => setFormData({ ...formData, bank_account_id: e.target.value })}
+                >
+                  <option value="">— Не указан</option>
+                  {bankAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name} — {a.account_number}</option>
                   ))}
                 </select>
               </div>

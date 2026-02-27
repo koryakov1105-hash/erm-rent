@@ -163,6 +163,24 @@ export interface Lease {
   created_at: string;
 }
 
+export interface BankAccount {
+  id: number;
+  name: string;
+  account_number: string;
+  comment?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const bankAccountsApi = {
+  getAll: () => api.get<BankAccount[]>('/bank-accounts'),
+  getById: (id: number) => api.get<BankAccount>(`/bank-accounts/${id}`),
+  create: (data: { name: string; account_number: string; comment?: string }) =>
+    api.post<BankAccount>('/bank-accounts', data),
+  update: (id: number, data: Partial<BankAccount>) => api.put<BankAccount>(`/bank-accounts/${id}`, data),
+  delete: (id: number) => api.delete(`/bank-accounts/${id}`),
+};
+
 export interface MandatoryPayment {
   id: number;
   unit_id?: number;
@@ -248,6 +266,7 @@ export interface Transaction {
   unit_id?: number | null;
   property_id?: number | null;
   lease_id?: number;
+  bank_account_id?: number | null;
   type: 'income' | 'expense';
   category?: string;
   category_detail?: string | null;
@@ -260,6 +279,8 @@ export interface Transaction {
   payer?: string;
   unit_number?: string;
   property_name?: string;
+  bank_account_name?: string | null;
+  bank_account_number?: string | null;
   status?: TransactionPaymentStatus;
   scheduled_pay_date?: string | null;
   created_at?: string;
@@ -276,7 +297,7 @@ export interface CalendarResponse {
 }
 
 export const transactionsApi = {
-  getAll: (params?: { type?: string; is_planned?: boolean; unit_id?: number; property_id?: number; start_date?: string; end_date?: string }) =>
+  getAll: (params?: { type?: string; is_planned?: boolean; unit_id?: number; property_id?: number; bank_account_id?: number; start_date?: string; end_date?: string }) =>
     api.get<Transaction[]>('/transactions', { params }),
   getCalendar: (params: { start_date: string; end_date: string }) =>
     api.get<CalendarResponse>('/transactions/calendar', { params }),
@@ -307,6 +328,20 @@ export interface InvoiceResponse {
 export const invoicesApi = {
   generate: (data: InvoiceRequest) =>
     api.post<InvoiceResponse>('/invoices/generate', data),
+};
+
+export interface BankStatementUploadResponse {
+  created: number;
+  transactions: Transaction[];
+}
+
+export const bankStatementsApi = {
+  upload: (file: File, bankAccountId: number) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('bank_account_id', String(bankAccountId));
+    return api.post<BankStatementUploadResponse>('/integrations/bank/upload', form);
+  },
 };
 
 export default api;

@@ -13,6 +13,7 @@ import Units from './pages/Units';
 import Tenants from './pages/Tenants';
 import Leases from './pages/Leases';
 import Finance from './pages/Finance';
+import BankStatementImport from './pages/BankStatementImport';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -121,6 +122,7 @@ function AppLayout() {
             </div>
           )}
           <SidebarLink to="/finance" icon={SidebarIcons.finance}>Финансы и платежи</SidebarLink>
+          <SidebarLink to="/finance/import-statement" icon={SidebarIcons.finance}>Импорт выписки</SidebarLink>
         </nav>
         <div className="sidebar-footer">
           <SidebarLink to="/profile" icon={SidebarIcons.profile}>Профиль пользователя</SidebarLink>
@@ -140,6 +142,7 @@ function AppLayout() {
             <Route path="/leases" element={<Leases />} />
             <Route path="/payments" element={<Navigate to="/finance" replace />} />
             <Route path="/finance" element={<Finance />} />
+            <Route path="/finance/import-statement" element={<BankStatementImport />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Navigate to="/profile" replace />} />
           </Routes>

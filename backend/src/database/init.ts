@@ -21,6 +21,7 @@ interface DatabaseData {
   tenant_payments: any[];
   transactions: any[];
   property_documents: any[];
+  bank_accounts: any[];
 }
 
 let data: DatabaseData = {
@@ -33,7 +34,8 @@ let data: DatabaseData = {
   actual_mandatory_payments: [],
   tenant_payments: [],
   transactions: [],
-  property_documents: []
+  property_documents: [],
+  bank_accounts: []
 };
 
 // Ensure database directory exists
@@ -60,14 +62,15 @@ function loadData(): void {
       actual_mandatory_payments: [],
       tenant_payments: [],
       transactions: [],
-      property_documents: []
+      property_documents: [],
+      bank_accounts: []
     };
   }
   // Ensure every table is an array (avoid 500 when JSON has wrong shape)
   const tables: (keyof DatabaseData)[] = [
     'users', 'properties', 'units', 'tenants', 'leases',
     'mandatory_payments', 'actual_mandatory_payments', 'tenant_payments', 'transactions',
-    'property_documents'
+    'property_documents', 'bank_accounts'
   ];
   for (const key of tables) {
     if (!Array.isArray((data as any)[key])) {

@@ -15,6 +15,8 @@ import tenantPaymentsRoutes from './routes/tenant-payments';
 import transactionsRoutes from './routes/transactions';
 import addressSuggestRoutes from './routes/address-suggest';
 import invoicesRoutes from './routes/invoices';
+import bankAccountsRoutes from './routes/bank-accounts';
+import integrationsRoutes from './routes/integrations';
 
 dotenv.config();
 
@@ -50,6 +52,8 @@ app.use('/api/tenant-payments', tenantPaymentsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/address-suggest', addressSuggestRoutes);
 app.use('/api/invoices', invoicesRoutes);
+app.use('/api/bank-accounts', bankAccountsRoutes);
+app.use('/api/integrations', integrationsRoutes);
 
 // В production: раздача собранного фронта из backend/public (если папка есть)
 const publicDir = path.join(__dirname, '..', 'public');

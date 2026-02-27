@@ -6,7 +6,7 @@ const router = express.Router();
 // GET /api/transactions - список транзакций
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { type, is_planned, unit_id, property_id, start_date, end_date } = req.query;
+    const { type, is_planned, unit_id, property_id, bank_account_id, start_date, end_date } = req.query;
     
     let transactions = dbAll('transactions');
     
@@ -27,6 +27,11 @@ router.get('/', async (req: Request, res: Response) => {
       transactions = transactions.filter((t: any) => t.property_id === parseInt(property_id as string));
     }
     
+    if (bank_account_id !== undefined && bank_account_id !== '') {
+      const aid = parseInt(bank_account_id as string);
+      transactions = transactions.filter((t: any) => t.bank_account_id === aid);
+    }
+    
     if (start_date || end_date) {
       transactions = transactions.filter((t: any) => {
         if (!t.date) return false;
@@ -41,11 +46,13 @@ router.get('/', async (req: Request, res: Response) => {
     const units = dbAll('units');
     const properties = dbAll('properties');
     const leases = dbAll('leases');
+    const bankAccounts = dbAll('bank_accounts');
     
     const transactionsWithDetails = transactions.map((transaction: any) => {
       const unit = transaction.unit_id ? units.find((u: any) => u.id === transaction.unit_id) : null;
       const property = transaction.property_id ? properties.find((p: any) => p.id === transaction.property_id) : null;
       const lease = transaction.lease_id ? leases.find((l: any) => l.id === transaction.lease_id) : null;
+      const bankAccount = transaction.bank_account_id ? bankAccounts.find((a: any) => a.id === transaction.bank_account_id) : null;
       
       const s = String(transaction.status || '').trim();
       const paymentStatus = s === 'invoiced' ? 'invoiced' : s === 'deferred' ? 'deferred' : 'paid';
@@ -54,6 +61,8 @@ router.get('/', async (req: Request, res: Response) => {
         unit_number: unit?.unit_number || null,
         property_name: property?.name || null,
         lease_id: lease?.id || null,
+        bank_account_name: bankAccount?.name || null,
+        bank_account_number: bankAccount?.account_number || null,
         status: paymentStatus,
         scheduled_pay_date: transaction.scheduled_pay_date || null
       };
@@ -151,7 +160,7 @@ router.get('/actual', async (req: Request, res: Response) => {
 // POST /api/transactions - создать транзакцию
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { unit_id, property_id, lease_id, type, category, category_detail, amount, date, description, is_planned, is_tenant_payment, related_payment_id, payer, status, scheduled_pay_date } = req.body;
+    const { unit_id, property_id, lease_id, bank_account_id, type, category, category_detail, amount, date, description, is_planned, is_tenant_payment, related_payment_id, payer, status, scheduled_pay_date } = req.body;
 
     if (!type || !amount || !date) {
       return res.status(400).json({ 
@@ -168,6 +177,7 @@ router.post('/', async (req: Request, res: Response) => {
       unit_id: unit_id ? parseInt(unit_id) : null,
       property_id: property_id ? parseInt(property_id) : null,
       lease_id: lease_id ? parseInt(lease_id) : null,
+      bank_account_id: bank_account_id != null && bank_account_id !== '' ? parseInt(bank_account_id) : null,
       type,
       category: category || null,
       category_detail: category_detail != null && String(category_detail).trim() !== '' ? String(category_detail).trim() : null,
@@ -193,7 +203,7 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { type, category, category_detail, amount, date, description, is_planned, is_tenant_payment, payer, unit_id, property_id, status, scheduled_pay_date } = req.body;
+    const { type, category, category_detail, amount, date, description, is_planned, is_tenant_payment, payer, unit_id, property_id, bank_account_id, status, scheduled_pay_date } = req.body;
 
     const updates: any = {};
     if (type !== undefined) updates.type = type;
@@ -207,6 +217,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (payer !== undefined) updates.payer = payer ? String(payer).trim() || null : null;
     if (unit_id !== undefined) updates.unit_id = unit_id ? parseInt(unit_id) : null;
     if (property_id !== undefined) updates.property_id = property_id ? parseInt(property_id) : null;
+    if (bank_account_id !== undefined) updates.bank_account_id = bank_account_id != null && bank_account_id !== '' ? parseInt(bank_account_id) : null;
     if (status !== undefined && status !== null) {
       const s = String(status).trim();
       updates.status = s === 'invoiced' ? 'invoiced' : s === 'deferred' ? 'deferred' : 'paid';
