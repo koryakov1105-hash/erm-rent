@@ -566,9 +566,14 @@ function Finance() {
       <div className="card finance-card">
         <div className="card-header">
           <h1 className="card-title">Финансы</h1>
-          <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-            Добавить транзакцию
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Link to="/finance/import-statement" className="btn btn-secondary">
+              Подгрузить выписку
+            </Link>
+            <button className="btn btn-primary" onClick={() => handleOpenModal()}>
+              Добавить транзакцию
+            </button>
+          </div>
         </div>
 
         <p className="finance-intro">
