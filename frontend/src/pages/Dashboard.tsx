@@ -391,6 +391,17 @@ function Dashboard() {
   }
   const maxVal = Math.max(1, ...monthLabels.flatMap((m) => [m.income, m.expense]));
 
+  // Доход и расход за текущий месяц (по тем же данным, что в разделе Финансы)
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const inCurrentMonth = (t: Transaction) => {
+    const dt = new Date(t.date);
+    return dt >= currentMonthStart && dt <= currentMonthEnd;
+  };
+  const incomeThisMonth = transactions.filter((t) => t.type === 'income' && inCurrentMonth(t)).reduce((s, t) => s + t.amount, 0);
+  const expenseThisMonth = transactions.filter((t) => t.type === 'expense' && inCurrentMonth(t)).reduce((s, t) => s + t.amount, 0);
+
   const unitForecasts = units.map((u) => {
     const plannedRent = u.monthly_rent || 0;
     const unitExpenses = transactions
@@ -735,19 +746,32 @@ function Dashboard() {
         <div className="metric-card dark">
           <div className="metric-card-header">
             <div>
+              <div className="metric-label">Доход за месяц</div>
+              <div className="metric-value" style={{ color: 'var(--color-success)' }}>
+                {incomeThisMonth.toLocaleString('ru-RU')} ₽
+              </div>
+            </div>
+            <div className="metric-icon">💰</div>
+          </div>
+          <div className="metric-change positive">
+            <span>↑</span>
+            <span>Этот месяц (из раздела Финансы)</span>
+          </div>
+        </div>
+
+        <div className="metric-card dark">
+          <div className="metric-card-header">
+            <div>
               <div className="metric-label">Общие расходы</div>
               <div className="metric-value">
-                {transactions
-                  .filter(t => t.type === 'expense')
-                  .reduce((sum, t) => sum + t.amount, 0)
-                  .toLocaleString('ru-RU')} ₽
+                {expenseThisMonth.toLocaleString('ru-RU')} ₽
               </div>
             </div>
             <div className="metric-icon">📊</div>
           </div>
           <div className="metric-change positive">
             <span>↑</span>
-            <span>Этот месяц</span>
+            <span>Этот месяц (из раздела Финансы)</span>
           </div>
         </div>
 
