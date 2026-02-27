@@ -4,6 +4,17 @@
 
 ---
 
+## Текущий прод (Render)
+
+- **Фронт:** [https://erm-kvadrat-app.onrender.com](https://erm-kvadrat-app.onrender.com)
+- **API:** `https://erm-kvadrat-api.onrender.com` (проверка: [https://erm-kvadrat-api.onrender.com/api/health](https://erm-kvadrat-api.onrender.com/api/health))
+
+Связь фронта с сервером задаётся переменной **`VITE_API_URL`**: при сборке фронта должен быть указан полный URL API до `/api`, например `https://erm-kvadrat-api.onrender.com/api`. В репозитории для этого добавлен файл `frontend/.env.production`. В Render для Static Site можно дополнительно задать в **Environment** переменную `VITE_API_URL` = `https://erm-kvadrat-api.onrender.com/api` — тогда она будет использоваться при сборке.
+
+После `git push origin main` Render автоматически пересоберёт и задеплоит оба сервиса (если репозиторий подключён).
+
+---
+
 ## Вариант 1: Render (бэкенд + фронтенд в одном месте)
 
 [Render](https://render.com) даёт бесплатный тариф для Web Service (бэкенд) и Static Site (фронтенд).
