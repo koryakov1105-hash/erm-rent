@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await authApi.login({ email, password });
+    const res = await authApi.login({ email, password }, { skipGlobalToast: true });
     if (res?.data?.token && res?.data?.user) {
       setAuthToken(res.data.token);
       setUser(res.data.user);
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, name?: string) => {
-    const res = await authApi.register({ email, password, name });
+    const res = await authApi.register({ email, password, name }, { skipGlobalToast: true });
     if (res?.data?.token && res?.data?.user) {
       setAuthToken(res.data.token);
       setUser(res.data.user);

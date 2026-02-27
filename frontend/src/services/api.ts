@@ -1,4 +1,11 @@
 import axios from 'axios';
+import { showGlobalToast } from '../contexts/ToastContext';
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    skipGlobalToast?: boolean;
+  }
+}
 
 // В production задайте VITE_API_URL (полный URL до /api), например https://your-api.onrender.com/api
 const baseURL = import.meta.env.VITE_API_URL || '/api';
@@ -9,6 +16,24 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status;
+    const skipToast = err.config?.skipGlobalToast === true;
+    if (status === 401 || skipToast) {
+      return Promise.reject(err);
+    }
+    const message =
+      (err.response?.data?.error && String(err.response.data.error)) ||
+      (err.code === 'ECONNABORTED' || err.message === 'Network Error'
+        ? 'Нет связи с сервером. Проверьте интернет.'
+        : 'Ошибка запроса');
+    showGlobalToast(message, 'error');
+    return Promise.reject(err);
+  }
+);
 
 export const addressSuggestApi = {
   suggest: (query: string, count = 10) =>
@@ -42,10 +67,10 @@ export interface AuthUser {
 }
 
 export const authApi = {
-  register: (data: { email: string; password: string; name?: string }) =>
-    api.post<{ token: string; user: AuthUser }>('/auth/register', data),
-  login: (data: { email: string; password: string }) =>
-    api.post<{ token: string; user: AuthUser }>('/auth/login', data),
+  register: (data: { email: string; password: string; name?: string }, config?: { skipGlobalToast?: boolean }) =>
+    api.post<{ token: string; user: AuthUser }>('/auth/register', data, { skipGlobalToast: config?.skipGlobalToast }),
+  login: (data: { email: string; password: string }, config?: { skipGlobalToast?: boolean }) =>
+    api.post<{ token: string; user: AuthUser }>('/auth/login', data, { skipGlobalToast: config?.skipGlobalToast }),
   me: () => api.get<AuthUser>('/auth/me'),
 };
 
@@ -343,6 +368,7 @@ export const bankStatementsApi = {
     // Не задаём Content-Type — браузер сам выставит multipart/form-data с boundary
     return api.post<BankStatementUploadResponse>('/integrations/bank/upload', form, {
       headers: { 'Content-Type': undefined as unknown as string },
+      skipGlobalToast: true,
     });
   },
 };

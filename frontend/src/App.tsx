@@ -1,22 +1,32 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider, ToastContainer } from './contexts/ToastContext';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import Breadcrumbs from './components/Breadcrumbs';
 import Header from './components/Header';
 import { SidebarIcons } from './components/SidebarIcons';
-import Dashboard from './pages/Dashboard';
-import Properties from './pages/Properties';
-import PropertyDetail from './pages/PropertyDetail';
-import Units from './pages/Units';
-import Tenants from './pages/Tenants';
-import Leases from './pages/Leases';
-import Finance from './pages/Finance';
-import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import './App.css';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Properties = lazy(() => import('./pages/Properties'));
+const PropertyDetail = lazy(() => import('./pages/PropertyDetail'));
+const Units = lazy(() => import('./pages/Units'));
+const Tenants = lazy(() => import('./pages/Tenants'));
+const Leases = lazy(() => import('./pages/Leases'));
+const Finance = lazy(() => import('./pages/Finance'));
+const Profile = lazy(() => import('./pages/Profile'));
+
+function PageFallback() {
+  return (
+    <div className="main-content-loading" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+      Загрузка…
+    </div>
+  );
+}
 
 function AuthScreen() {
   const location = useLocation();
@@ -131,18 +141,20 @@ function AppLayout() {
         <Header />
         <main className="main-content">
           <Breadcrumbs />
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/properties" element={<Properties />} />
-            <Route path="/properties/:id" element={<PropertyDetail />} />
-            <Route path="/units" element={<Units />} />
-            <Route path="/tenants" element={<Tenants />} />
-            <Route path="/leases" element={<Leases />} />
-            <Route path="/payments" element={<Navigate to="/finance" replace />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<Navigate to="/profile" replace />} />
-          </Routes>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/properties" element={<Properties />} />
+              <Route path="/properties/:id" element={<PropertyDetail />} />
+              <Route path="/units" element={<Units />} />
+              <Route path="/tenants" element={<Tenants />} />
+              <Route path="/leases" element={<Leases />} />
+              <Route path="/payments" element={<Navigate to="/finance" replace />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Navigate to="/profile" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
@@ -178,17 +190,20 @@ function AppRoutes() {
 function App() {
   return (
     <ThemeProvider>
-      <SidebarProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<AuthScreen />} />
-              <Route path="/register" element={<AuthScreen />} />
-              <Route path="*" element={<AppRoutes />} />
-            </Routes>
-          </AuthProvider>
-        </Router>
-      </SidebarProvider>
+      <ToastProvider>
+        <SidebarProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <AuthProvider>
+              <ToastContainer />
+              <Routes>
+                <Route path="/login" element={<AuthScreen />} />
+                <Route path="/register" element={<AuthScreen />} />
+                <Route path="*" element={<AppRoutes />} />
+              </Routes>
+            </AuthProvider>
+          </Router>
+        </SidebarProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }
