@@ -46,8 +46,9 @@ router.post('/bank/upload', upload.single('file'), async (req: Request, res: Res
 
     let rows: ParsedStatementRow[];
     try {
-      rows = parseStatement(file.buffer, format);
+      rows = parseStatement(Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer), format);
     } catch (err: any) {
+      console.error('Parse statement error:', err);
       return res.status(400).json({
         error: 'Ошибка разбора файла выписки.',
         details: err?.message || String(err)
