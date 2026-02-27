@@ -8,6 +8,7 @@ import {
   tenantsApi,
   leasesApi,
   bankAccountsApi,
+  bankStatementsApi,
   Transaction,
   Unit,
   Property,
@@ -38,6 +39,15 @@ function Finance() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [showStatementModal, setShowStatementModal] = useState(false);
+  const [statementFile, setStatementFile] = useState<File | null>(null);
+  const [statementAccountId, setStatementAccountId] = useState<string>('');
+  const [statementUploading, setStatementUploading] = useState(false);
+  const [statementError, setStatementError] = useState<string | null>(null);
+  const [statementSuccessCount, setStatementSuccessCount] = useState<number | null>(null);
+  const [showAddAccountInStatement, setShowAddAccountInStatement] = useState(false);
+  const [newBankAccount, setNewBankAccount] = useState({ name: '', account_number: '', comment: '' });
+  const [savingNewBankAccount, setSavingNewBankAccount] = useState(false);
   const [formData, setFormData] = useState({
     unit_id: '',
     property_id: '',
@@ -294,6 +304,54 @@ function Finance() {
     } catch (error) {
       console.error('Error deleting transaction:', error);
       alert('Ошибка удаления транзакции');
+    }
+  };
+
+  const handleAddBankAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBankAccount.name.trim() || !newBankAccount.account_number.trim()) {
+      setStatementError('Укажите название и номер счёта');
+      return;
+    }
+    setSavingNewBankAccount(true);
+    setStatementError(null);
+    try {
+      await bankAccountsApi.create({
+        name: newBankAccount.name.trim(),
+        account_number: newBankAccount.account_number.trim(),
+        comment: newBankAccount.comment.trim() || undefined,
+      });
+      await loadBankAccounts();
+      setShowAddAccountInStatement(false);
+      setNewBankAccount({ name: '', account_number: '', comment: '' });
+    } catch (err: any) {
+      setStatementError(err?.response?.data?.error || 'Не удалось добавить счёт');
+    } finally {
+      setSavingNewBankAccount(false);
+    }
+  };
+
+  const handleStatementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!statementAccountId || !statementFile) {
+      setStatementError(statementAccountId ? 'Выберите файл выписки (.xml или .xlsx)' : 'Выберите банковский счёт');
+      return;
+    }
+    setStatementUploading(true);
+    setStatementError(null);
+    setStatementSuccessCount(null);
+    try {
+      const res = await bankStatementsApi.upload(statementFile, parseInt(statementAccountId, 10));
+      setStatementSuccessCount(res.data?.created ?? 0);
+      setStatementFile(null);
+      const input = document.getElementById('statement-file-input') as HTMLInputElement;
+      if (input) input.value = '';
+      await loadTransactions(true);
+      loadCalendar();
+    } catch (err: any) {
+      setStatementError(err?.response?.data?.error || err?.response?.data?.details || 'Ошибка загрузки выписки');
+    } finally {
+      setStatementUploading(false);
     }
   };
 
@@ -567,9 +625,9 @@ function Finance() {
         <div className="card-header">
           <h1 className="card-title">Финансы</h1>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <Link to="/finance/import-statement" className="btn btn-secondary">
-              Подгрузить выписку
-            </Link>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowStatementModal(true)}>
+              Выгрузить выписку
+            </button>
             <button className="btn btn-primary" onClick={() => handleOpenModal()}>
               Добавить транзакцию
             </button>
@@ -960,6 +1018,75 @@ function Finance() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showStatementModal && (
+        <div className="modal" onClick={() => { setShowStatementModal(false); setStatementError(null); setStatementSuccessCount(null); }}>
+          <div className="modal-content modal-content-scroll" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Выгрузить выписку</h2>
+              <button type="button" className="close-btn" onClick={() => { setShowStatementModal(false); setStatementError(null); setStatementSuccessCount(null); }}>×</button>
+            </div>
+            <p className="muted" style={{ marginBottom: '1rem' }}>
+              Выберите банковский счёт и загрузите файл выписки (.xml или .xlsx, .xls). Все операции будут привязаны к выбранному счёту.
+            </p>
+            {bankAccounts.length === 0 && !showAddAccountInStatement && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--color-surface-alt)', borderRadius: 'var(--radius)' }}>
+                <p>Сначала добавьте банковский счёт.</p>
+                <button type="button" className="btn btn-primary" onClick={() => setShowAddAccountInStatement(true)}>
+                  Добавить банковский счёт
+                </button>
+              </div>
+            )}
+            {showAddAccountInStatement && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--color-surface-alt)', borderRadius: 'var(--radius)' }}>
+                <h3 style={{ marginTop: 0 }}>Новый банковский счёт</h3>
+                <form onSubmit={handleAddBankAccount}>
+                  <div className="form-group">
+                    <label>Название</label>
+                    <input type="text" className="form-input" value={newBankAccount.name} onChange={(e) => setNewBankAccount((a) => ({ ...a, name: e.target.value }))} placeholder="Например: Расчётный счёт ООО" required />
+                  </div>
+                  <div className="form-group">
+                    <label>Номер счёта</label>
+                    <input type="text" className="form-input" value={newBankAccount.account_number} onChange={(e) => setNewBankAccount((a) => ({ ...a, account_number: e.target.value }))} placeholder="20 цифр" required />
+                  </div>
+                  <div className="form-group">
+                    <label>Комментарий (необязательно)</label>
+                    <input type="text" className="form-input" value={newBankAccount.comment} onChange={(e) => setNewBankAccount((a) => ({ ...a, comment: e.target.value }))} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button type="submit" className="btn btn-primary" disabled={savingNewBankAccount}>{savingNewBankAccount ? 'Сохранение…' : 'Сохранить'}</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => { setShowAddAccountInStatement(false); setStatementError(null); }}>Отмена</button>
+                  </div>
+                </form>
+              </div>
+            )}
+            {bankAccounts.length > 0 && (
+              <form onSubmit={handleStatementSubmit}>
+                <div className="form-group">
+                  <label htmlFor="statement-account">Банковский счёт *</label>
+                  <select id="statement-account" className="form-input" value={statementAccountId} onChange={(e) => { setStatementAccountId(e.target.value); setStatementError(null); }} required>
+                    <option value="">— Выберите счёт —</option>
+                    {bankAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name} — {a.account_number}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="statement-file-input">Файл выписки (.xml, .xlsx, .xls)</label>
+                  <input id="statement-file-input" name="statement" type="file" accept=".xml,.xlsx,.xls" onChange={(e) => { const f = e.target.files?.[0]; setStatementFile(f || null); setStatementError(null); setStatementSuccessCount(null); }} className="form-input" />
+                  {statementFile && <p className="muted" style={{ marginTop: '0.25rem' }}>Выбран: {statementFile.name}</p>}
+                </div>
+                {statementError && <p style={{ color: 'var(--color-error)', marginBottom: '0.5rem' }}>{statementError}</p>}
+                {statementSuccessCount !== null && <p style={{ color: 'var(--color-success)', marginBottom: '0.5rem' }}>Импортировано транзакций: {statementSuccessCount}. Список обновлён.</p>}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button type="submit" className="btn btn-primary" disabled={statementUploading || !statementFile}>{statementUploading ? 'Загрузка…' : 'Импортировать'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowAddAccountInStatement(true)}>Добавить счёт</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
