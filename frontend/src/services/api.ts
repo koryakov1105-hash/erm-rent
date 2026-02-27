@@ -340,7 +340,10 @@ export const bankStatementsApi = {
     const form = new FormData();
     form.append('file', file);
     form.append('bank_account_id', String(bankAccountId));
-    return api.post<BankStatementUploadResponse>('/integrations/bank/upload', form);
+    // Не задаём Content-Type — браузер сам выставит multipart/form-data с boundary
+    return api.post<BankStatementUploadResponse>('/integrations/bank/upload', form, {
+      headers: { 'Content-Type': undefined as unknown as string },
+    });
   },
 };
 
