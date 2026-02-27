@@ -13,10 +13,18 @@ export interface ParsedStatementRow {
   counterparty?: string;
 }
 
-const DATE_REGEX = /(\d{4})-(\d{2})-(\d{2})|(\d{2})\.(\d{2})\.(\d{4})|(\d{2})\/(\d{2})\/(\d{4})/;
-
 function normalizeDate(value: unknown): string | null {
   if (value == null) return null;
+  // Excel с cellDates: true отдаёт объект Date
+  if (typeof value === 'object' && value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return value.toISOString().slice(0, 10);
+  }
+  // Excel иногда отдаёт дату как серийный номер (дни с 1899-12-30)
+  if (typeof value === 'number' && !isNaN(value) && value > 0) {
+    const d = new Date((value - 25569) * 86400 * 1000);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
   const s = String(value).trim();
   if (!s) return null;
   // YYYY-MM-DD
@@ -28,6 +36,19 @@ function normalizeDate(value: unknown): string | null {
   // DD/MM/YYYY
   const dmy2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (dmy2) return `${dmy2[3]}-${dmy2[2].padStart(2, '0')}-${dmy2[1].padStart(2, '0')}`;
+  // D/M/YY или DD.MM.YY (двузначный год)
+  const dmyShort = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (dmyShort) {
+    const yy = parseInt(dmyShort[3], 10);
+    const year = yy >= 0 && yy <= 99 ? 2000 + yy : yy;
+    return `${year}-${dmyShort[2].padStart(2, '0')}-${dmyShort[1].padStart(2, '0')}`;
+  }
+  const dmyShortDot = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})$/);
+  if (dmyShortDot) {
+    const yy = parseInt(dmyShortDot[3], 10);
+    const year = yy >= 0 && yy <= 99 ? 2000 + yy : yy;
+    return `${year}-${dmyShortDot[2].padStart(2, '0')}-${dmyShortDot[1].padStart(2, '0')}`;
+  }
   try {
     const d = new Date(s);
     if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
@@ -40,78 +61,121 @@ function normalizeDate(value: unknown): string | null {
 function normalizeAmount(value: unknown): number | null {
   if (value == null || value === '') return null;
   if (typeof value === 'number' && !isNaN(value)) return value;
-  const s = String(value).trim().replace(/\s/g, '').replace(',', '.');
+  let s = String(value).trim().replace(/\s/g, '');
+  // Удаляем разделитель тысяч (запятая: 1,440.00 -> 1440.00)
+  s = s.replace(/,/g, '');
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
 
 const EXCEL_DATE_COLUMNS = [
-  'дата', 'date', 'Дата', 'Date', 'ДАТА', 'дата операции', 'Дата операции',
-  'дата проводки', 'Дата проводки'
+  'дата', 'date', 'Дата', 'Date', 'ДАТА', 'дата операции', 'Дата операции', 'posting date',
+  'дата проводки', 'Дата проводки', 'дата операции / posting date'
 ];
 const EXCEL_AMOUNT_COLUMNS = [
   'сумма', 'amount', 'Сумма', 'Amount', 'СУММА', 'сумма операции', 'Сумма операции',
-  'приход', 'расход', 'Приход', 'Расход'
+  'приход', 'расход', 'Приход', 'Расход', 'дебет', 'кредит', 'Дебет', 'Кредит', 'Debit', 'Credit'
 ];
 const EXCEL_DESC_COLUMNS = [
   'назначение', 'описание', 'description', 'Назначение', 'Описание', 'Description',
-  'назначение платежа', 'Назначение платежа', 'содержание операции', 'Содержание операции'
+  'назначение платежа', 'Назначение платежа', 'содержание операции', 'Содержание операции',
+  'основание операции', 'payment details', 'Основание операции'
 ];
 const EXCEL_COUNTERPARTY_COLUMNS = [
   'контрагент', 'counterparty', 'Контрагент', 'Counterparty', 'получатель', 'плательщик',
-  'Получатель', 'Плательщик'
+  'Получатель', 'Плательщик', 'наименование', 'Name', 'реквизиты корреспондента'
 ];
 
+function normalizeKey(k: string): string {
+  return k.replace(/\uFEFF/g, '').trim().toLowerCase();
+}
+
 function findColumnKey(row: Record<string, unknown>, columnNames: string[]): string | null {
-  const keys = Object.keys(row).map((k) => k.trim().toLowerCase());
+  const rawKeys = Object.keys(row);
   for (const name of columnNames) {
     const lower = name.toLowerCase();
-    const found = Object.keys(row).find((k) => k.trim().toLowerCase() === lower);
+    const found = rawKeys.find((k) => normalizeKey(k) === lower);
     if (found) return found;
   }
   for (const name of columnNames) {
     const lower = name.toLowerCase();
-    const found = keys.find((k) => k.includes(lower) || lower.includes(k));
-    if (found) {
-      return Object.keys(row).find((k) => k.trim().toLowerCase() === found) || null;
-    }
+    const found = rawKeys.find((k) => {
+      const n = normalizeKey(k);
+      return n && (n.includes(lower) || lower.includes(n));
+    });
+    if (found) return found;
   }
   return null;
 }
 
+function findHeaderRowFromRaw(rawRows: unknown[][]): number {
+  const maxSearch = Math.min(20, rawRows.length);
+  for (let r = 0; r < maxSearch; r++) {
+    const row = rawRows[r];
+    if (!Array.isArray(row)) continue;
+    const cells = row.map((c) => String(c ?? '').trim().toLowerCase());
+    const hasDate = cells.some((c) => /дата\s*(операции|проводки)?|posting\s*date/i.test(c));
+    const hasAmount = cells.some((c) => /сумма|приход|расход|дебет|кредит|amount|debit|credit/i.test(c));
+    if (hasDate && hasAmount) return r;
+  }
+  return -1;
+}
+
 export function parseExcel(buffer: Buffer): ParsedStatementRow[] {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const xlsxLib = (XLSX as any).default || XLSX;
+  const workbook = xlsxLib.read(buffer, { type: 'buffer', cellDates: true, cellNF: false });
+  const sheetName = workbook.SheetNames && workbook.SheetNames[0];
+  if (!sheetName) return [];
+  const sheet = workbook.Sheets[sheetName];
   if (!sheet) return [];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false });
+
+  const rawRows: unknown[][] = xlsxLib.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  if (rawRows.length === 0) return [];
+
+  let headerRowIndex = findHeaderRowFromRaw(rawRows);
+  if (headerRowIndex < 0) headerRowIndex = 0;
+
+  const opts: any = { defval: '', raw: false };
+  if (headerRowIndex > 0) opts.range = headerRowIndex;
+  const rows: Record<string, unknown>[] = xlsxLib.utils.sheet_to_json(sheet, opts);
   if (rows.length === 0) return [];
 
   const first = rows[0];
   const dateKey = findColumnKey(first, EXCEL_DATE_COLUMNS);
   const amountKey = findColumnKey(first, EXCEL_AMOUNT_COLUMNS);
+  const debitKey = Object.keys(first).find((k) => /дебет|debit|расход/i.test(normalizeKey(k)));
+  const creditKey = Object.keys(first).find((k) => /кредит|credit|приход/i.test(normalizeKey(k)));
   const descKey = findColumnKey(first, EXCEL_DESC_COLUMNS);
   const counterpartyKey = findColumnKey(first, EXCEL_COUNTERPARTY_COLUMNS);
 
-  if (!dateKey || !amountKey) {
-    throw new Error('В файле Excel не найдены колонки с датой и суммой. Ожидаются заголовки: Дата, Сумма (или аналоги).');
+  const hasDebitCredit = !!(debitKey && creditKey);
+
+  if (!dateKey) {
+    throw new Error('В файле Excel не найдена колонка с датой. Ожидаются заголовки: Дата, Дата операции (или аналоги).');
+  }
+  if (!amountKey && !hasDebitCredit) {
+    throw new Error('В файле Excel не найдены колонки с суммой. Ожидаются заголовки: Сумма, Дебет/Кредит (или аналоги).');
   }
 
   const result: ParsedStatementRow[] = [];
-  for (let i = 0; i < rows.length; i++) {
+  for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const dateStr = normalizeDate(row[dateKey]);
     if (!dateStr) continue;
-    let amount = normalizeAmount(row[amountKey]);
-    if (amount === null) continue;
-    // Если в файле две колонки "приход" и "расход" — ищем обе
-    if (amount === 0 && !row[amountKey]) {
-      const creditKey = Object.keys(row).find((k) => /приход|credit|доход/i.test(k));
-      const debitKey = Object.keys(row).find((k) => /расход|debit|списание/i.test(k));
-      const credit = normalizeAmount(creditKey ? row[creditKey] : null);
+    let amount: number;
+    if (hasDebitCredit) {
       const debit = normalizeAmount(debitKey ? row[debitKey] : null);
-      if (credit != null && credit !== 0) amount = credit;
-      else if (debit != null && debit !== 0) amount = -Math.abs(debit);
-      else continue;
+      const credit = normalizeAmount(creditKey ? row[creditKey] : null);
+      const d = debit ?? 0;
+      const c = credit ?? 0;
+      if (d === 0 && c === 0) continue;
+      amount = c - d;
+    } else {
+      const a = normalizeAmount(amountKey ? row[amountKey] : null);
+      if (a === null) continue;
+      amount = a;
+      const keyLower = amountKey ? normalizeKey(amountKey) : '';
+      if (/дебет|debit|расход/i.test(keyLower)) amount = -Math.abs(amount);
     }
     const description = descKey != null && row[descKey] != null ? String(row[descKey]).trim() || undefined : undefined;
     const counterparty = counterpartyKey != null && row[counterpartyKey] != null ? String(row[counterpartyKey]).trim() || undefined : undefined;
