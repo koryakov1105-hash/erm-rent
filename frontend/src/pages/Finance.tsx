@@ -160,8 +160,22 @@ function Finance() {
   }, []);
 
   useEffect(() => {
+    loadProperties();
+    loadBankAccounts();
     loadTransactions();
   }, [filterType, filterPlanned, filterPropertyId, filterBankAccountId, filterStartDate, filterEndDate]);
+
+  // Сброс фильтров, если выбранный объект или счёт удалён/не в списке
+  useEffect(() => {
+    if (filterPropertyId && properties.length > 0 && !properties.some((p) => String(p.id) === filterPropertyId)) {
+      setFilterPropertyId('');
+    }
+  }, [properties, filterPropertyId]);
+  useEffect(() => {
+    if (filterBankAccountId && bankAccounts.length > 0 && !bankAccounts.some((a) => String(a.id) === filterBankAccountId)) {
+      setFilterBankAccountId('');
+    }
+  }, [bankAccounts, filterBankAccountId]);
 
   const loadCalendar = async () => {
     const match = String(calendarMonth || '').match(/^(\d{4})-(\d{1,2})$/);
@@ -676,7 +690,7 @@ function Finance() {
             >
               <option value="">Все объекты</option>
               {properties.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={String(p.id)}>{p.name}</option>
               ))}
             </select>
           </div>
@@ -689,7 +703,7 @@ function Finance() {
             >
               <option value="">Все счета</option>
               {bankAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name} — {a.account_number}</option>
+                <option key={a.id} value={String(a.id)}>{a.name} — {a.account_number}</option>
               ))}
             </select>
           </div>
