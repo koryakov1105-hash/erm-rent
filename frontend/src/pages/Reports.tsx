@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { transactionsApi, unitsApi, Transaction, Unit } from '../services/api';
+import {
+  transactionsApi,
+  unitsApi,
+  reportsApi,
+  downloadReportFile,
+  Transaction,
+  Unit,
+  CashFlowSection,
+  ProfitLossLine,
+} from '../services/api';
 
 type MonthData = { month: string; monthShort: string; income: number; expense: number; profit: number };
 
@@ -9,6 +18,15 @@ function Reports() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [chartMonths, setChartMonths] = useState(6);
+  const [reportStart, setReportStart] = useState('');
+  const [reportEnd, setReportEnd] = useState('');
+  const [cashFlow, setCashFlow] = useState<{ sections: CashFlowSection[]; total_net_cash_flow: number } | null>(null);
+  const [pl, setPl] = useState<{
+    lines: ProfitLossLine[];
+    net_income: number;
+  } | null>(null);
+  const [balance, setBalance] = useState<{ assets: { line: string; amount: number }[]; note?: string } | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -22,18 +40,43 @@ function Reports() {
       start.setMonth(start.getMonth() - chartMonths);
       const startStr = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-01';
       const endStr = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate()).padStart(2, '0');
-      const [txRes, unitsRes] = await Promise.all([
+      setReportStart(startStr);
+      setReportEnd(endStr);
+      const [txRes, unitsRes, cfRes, plRes, balRes] = await Promise.all([
         transactionsApi.getAll({ start_date: startStr, end_date: endStr }),
         unitsApi.getAll(),
+        reportsApi.getCashFlow({ start_date: startStr, end_date: endStr }).catch(() => ({ data: null })),
+        reportsApi.getProfitLoss({ start_date: startStr, end_date: endStr }).catch(() => ({ data: null })),
+        reportsApi.getBalanceSimple({ end_date: endStr }).catch(() => ({ data: null })),
       ]);
       setTransactions(Array.isArray(txRes.data) ? txRes.data : []);
       setUnits(Array.isArray(unitsRes.data) ? unitsRes.data : []);
+      const cf = cfRes.data as { sections?: CashFlowSection[]; total_net_cash_flow?: number } | null;
+      setCashFlow(cf && cf.sections ? { sections: cf.sections, total_net_cash_flow: cf.total_net_cash_flow ?? 0 } : null);
+      const p = plRes.data as { lines?: ProfitLossLine[]; net_income?: number } | null;
+      setPl(p && p.lines ? { lines: p.lines, net_income: p.net_income ?? 0 } : null);
+      setBalance((balRes.data as typeof balance) || null);
     } catch (e) {
       console.error(e);
       setTransactions([]);
       setUnits([]);
+      setCashFlow(null);
+      setPl(null);
+      setBalance(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async (format: 'xlsx' | 'pdf', type: 'cash_flow' | 'profit_loss') => {
+    if (!reportStart || !reportEnd) return;
+    try {
+      setExporting(`${type}-${format}`);
+      await downloadReportFile(format, type, { start_date: reportStart, end_date: reportEnd });
+    } catch (e: any) {
+      alert(e?.message || 'Ошибка выгрузки');
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -99,6 +142,100 @@ function Reports() {
             </select>
           </div>
         </div>
+
+        {reportStart && reportEnd && (
+          <section className="report-section">
+            <h2 className="report-section-title">Управленческие отчёты (факт)</h2>
+            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Период совпадает с графиком ниже: {reportStart} — {reportEnd}. Классификация по счетам учёта (раздел «Финансы» / поле счёта у проводки).
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport('xlsx', 'cash_flow')}>
+                {exporting === 'cash_flow-xlsx' ? '…' : 'ДДС → Excel'}
+              </button>
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport('pdf', 'cash_flow')}>
+                {exporting === 'cash_flow-pdf' ? '…' : 'ДДС → PDF'}
+              </button>
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport('xlsx', 'profit_loss')}>
+                {exporting === 'profit_loss-xlsx' ? '…' : 'ОПиУ → Excel'}
+              </button>
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport('pdf', 'profit_loss')}>
+                {exporting === 'profit_loss-pdf' ? '…' : 'ОПиУ → PDF'}
+              </button>
+            </div>
+            {cashFlow && (
+              <>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Движение денежных средств (упрощённо)</h3>
+                <table className="table" style={{ marginBottom: '1.25rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Деятельность</th>
+                      <th>Приток</th>
+                      <th>Отток</th>
+                      <th>Чистый</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashFlow.sections.map((s) => (
+                      <tr key={s.activity}>
+                        <td>{s.label}</td>
+                        <td>{s.inflow.toLocaleString('ru-RU')}</td>
+                        <td>{s.outflow.toLocaleString('ru-RU')}</td>
+                        <td>{s.net.toLocaleString('ru-RU')}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ fontWeight: 700 }}>
+                      <td>Итого</td>
+                      <td colSpan={2} />
+                      <td>{cashFlow.total_net_cash_flow.toLocaleString('ru-RU')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            )}
+            {pl && (
+              <>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Прибыль и убыток (управленческий)</h3>
+                <table className="table" style={{ marginBottom: '1.25rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Статья</th>
+                      <th>Сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pl.lines.map((l) => (
+                      <tr key={l.key}>
+                        <td>{l.label}</td>
+                        <td>{l.amount.toLocaleString('ru-RU')}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ fontWeight: 700 }}>
+                      <td>Чистая прибыль</td>
+                      <td>{pl.net_income.toLocaleString('ru-RU')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            )}
+            {balance?.assets?.length ? (
+              <>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Упрощённый баланс</h3>
+                <table className="table">
+                  <tbody>
+                    {balance.assets.map((a) => (
+                      <tr key={a.line}>
+                        <td>{a.line}</td>
+                        <td>{a.amount.toLocaleString('ru-RU')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {balance.note && <p className="text-secondary" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>{balance.note}</p>}
+              </>
+            ) : null}
+          </section>
+        )}
 
         <section className="report-section">
           <h2 className="report-section-title">График платежей (план/факт по месяцам)</h2>

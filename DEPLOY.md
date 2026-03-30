@@ -58,7 +58,7 @@
    - **Value:** `https://ВАШ-БЭКЕНД-URL.onrender.com/api`  
      (подставьте ваш URL из шага 2, в конце обязательно `/api`).
 5. **Create Static Site**. Дождитесь сборки.
-6. **Обязательно настройте Rewrite для SPA** (иначе прямые ссылки вроде `/register` или `/login` дадут 404):
+6. **Обязательно настройте Rewrite для SPA** (иначе прямые ссылки вроде `/register`, `/login`, `/reports`, `/budgets`, `/payment-requests`, `/bank-rules` дадут 404):
    - В Render откройте ваш **Static Site** → вкладка **Redirects/Rewrites**.
    - Добавьте правило:
      - **Source Path:** `/*`

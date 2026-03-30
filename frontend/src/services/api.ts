@@ -59,11 +59,14 @@ export function setAuthToken(t: string | null) {
   }
 }
 
+export type UserRole = 'admin' | 'finance' | 'operator';
+
 export interface AuthUser {
   id: number;
   email: string;
   name: string;
   is_first?: boolean;
+  role?: UserRole;
 }
 
 export const authApi = {
@@ -292,6 +295,9 @@ export interface Transaction {
   property_id?: number | null;
   lease_id?: number;
   bank_account_id?: number | null;
+  ledger_account_id?: number | null;
+  ledger_account_code?: string | null;
+  ledger_account_name?: string | null;
   type: 'income' | 'expense';
   category?: string;
   category_detail?: string | null;
@@ -308,6 +314,8 @@ export interface Transaction {
   bank_account_number?: string | null;
   status?: TransactionPaymentStatus;
   scheduled_pay_date?: string | null;
+  vat_rate?: number | null;
+  amount_excl_vat?: number | null;
   created_at?: string;
 }
 
@@ -316,9 +324,200 @@ export interface CalendarItem extends Transaction {
   display_date: string;
 }
 
+export interface CashForecastDay {
+  date: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+  balance_cumulative: number;
+}
+
 export interface CalendarResponse {
   by_date: Record<string, CalendarItem[]>;
   dates: string[];
+  opening_balance?: number;
+  cash_forecast?: CashForecastDay[];
+}
+
+export interface LedgerAccount {
+  id: number;
+  code: string;
+  name: string;
+  kind: 'income' | 'expense';
+  cfs_activity: string;
+  pl_group: string;
+  mapped_categories: string[];
+}
+
+export const ledgerAccountsApi = {
+  getAll: () => api.get<LedgerAccount[]>('/ledger-accounts'),
+  create: (data: Partial<LedgerAccount> & { mapped_categories?: string[] }) =>
+    api.post<LedgerAccount>('/ledger-accounts', data),
+  update: (id: number, data: Partial<LedgerAccount> & { mapped_categories?: string[] }) =>
+    api.put<LedgerAccount>(`/ledger-accounts/${id}`, data),
+  delete: (id: number) => api.delete(`/ledger-accounts/${id}`),
+};
+
+export interface CashFlowSection {
+  activity: string;
+  label: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+}
+
+export interface ProfitLossLine {
+  key: string;
+  label: string;
+  amount: number;
+}
+
+export const reportsApi = {
+  getCashFlow: (params: { start_date: string; end_date: string; property_id?: number }) =>
+    api.get<{ period: object; sections: CashFlowSection[]; total_net_cash_flow: number }>(
+      '/reports/cash-flow',
+      { params }
+    ),
+  getProfitLoss: (params: { start_date: string; end_date: string; property_id?: number }) =>
+    api.get<{
+      period: object;
+      lines: ProfitLossLine[];
+      revenue_total: number;
+      expense_total: number;
+      net_income: number;
+    }>('/reports/profit-loss', { params }),
+  getBalanceSimple: (params: { end_date: string; property_id?: number }) =>
+    api.get('/reports/balance-simple', { params }),
+  exportUrl: (format: 'xlsx' | 'pdf', type: 'cash_flow' | 'profit_loss', params: Record<string, string | number>) => {
+    const sp = new URLSearchParams({ format, type, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
+    return `${baseURL}/reports/export?${sp.toString()}`;
+  },
+};
+
+export interface InsightAlert {
+  level: 'warning' | 'danger' | 'info';
+  code: string;
+  message: string;
+}
+
+export const insightsApi = {
+  get: () =>
+    api.get<{
+      alerts: InsightAlert[];
+      deviations: Record<string, number | null>;
+    }>('/insights'),
+};
+
+export interface Budget {
+  id: number;
+  name: string;
+  period_start: string;
+  period_end: string;
+}
+
+export interface BudgetLine {
+  id: number;
+  budget_id: number;
+  ledger_account_id: number | null;
+  property_id: number | null;
+  amount_plan: number;
+  amount_actual?: number;
+  variance?: number;
+  variance_pct?: number | null;
+}
+
+export const budgetsApi = {
+  getAll: () => api.get<Budget[]>('/budgets'),
+  getById: (id: number) => api.get<Budget & { lines: BudgetLine[] }>(`/budgets/${id}`),
+  create: (data: { name: string; period_start: string; period_end: string }) =>
+    api.post<Budget>('/budgets', data),
+  putLines: (id: number, lines: { ledger_account_id?: number | null; property_id?: number | null; amount_plan: number }[]) =>
+    api.put<{ budget_id: number; lines: BudgetLine[] }>(`/budgets/${id}/lines`, { lines }),
+  vsActual: (id: number) =>
+    api.get<{ budget: Budget; lines: BudgetLine[] }>(`/budgets/${id}/vs-actual`),
+  delete: (id: number) => api.delete(`/budgets/${id}`),
+};
+
+export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'paid' | 'rejected';
+
+export interface PaymentRequest {
+  id: number;
+  title: string;
+  amount: number;
+  due_date: string;
+  property_id?: number | null;
+  comment?: string | null;
+  status: PaymentRequestStatus;
+  mandatory_payment_id?: number | null;
+  created_by_user_id?: number | null;
+}
+
+export const paymentRequestsApi = {
+  getAll: () => api.get<PaymentRequest[]>('/payment-requests'),
+  create: (data: Partial<PaymentRequest>) => api.post<PaymentRequest>('/payment-requests', data),
+  patch: (id: number, data: Partial<{ status: PaymentRequestStatus; title: string; amount: number; due_date: string; comment: string }>) =>
+    api.patch<PaymentRequest>(`/payment-requests/${id}`, data),
+  delete: (id: number) => api.delete(`/payment-requests/${id}`),
+};
+
+export interface BankMatchRule {
+  id: number;
+  pattern: string;
+  match_field: 'description' | 'counterparty';
+  ledger_account_id: number | null;
+  property_id: number | null;
+  priority: number;
+}
+
+export const bankMatchRulesApi = {
+  getAll: () => api.get<BankMatchRule[]>('/bank-match-rules'),
+  create: (data: Partial<BankMatchRule>) => api.post<BankMatchRule>('/bank-match-rules', data),
+  update: (id: number, data: Partial<BankMatchRule>) => api.put<BankMatchRule>(`/bank-match-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/bank-match-rules/${id}`),
+};
+
+export interface AuditLogEntry {
+  id: number;
+  action: string;
+  entity_type: string;
+  entity_id?: number | null;
+  user_id?: number | null;
+  payload?: string | null;
+  created_at?: string;
+}
+
+export const auditLogApi = {
+  getAll: () => api.get<AuditLogEntry[]>('/audit-log'),
+};
+
+/** Скачать экспорт отчёта (XLSX/PDF) с авторизацией. */
+export async function downloadReportFile(
+  format: 'xlsx' | 'pdf',
+  type: 'cash_flow' | 'profit_loss',
+  params: { start_date: string; end_date: string; property_id?: number }
+): Promise<void> {
+  const token = localStorage.getItem('token');
+  const sp = new URLSearchParams({
+    format,
+    type,
+    start_date: params.start_date,
+    end_date: params.end_date,
+    ...(params.property_id != null ? { property_id: String(params.property_id) } : {}),
+  });
+  const url = `${baseURL}/reports/export?${sp.toString()}`;
+  const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Ошибка выгрузки');
+  }
+  const blob = await res.blob();
+  const ext = format === 'xlsx' ? 'xlsx' : 'pdf';
+  const name = type === 'cash_flow' ? `cash-flow.${ext}` : `profit-loss.${ext}`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 export const transactionsApi = {

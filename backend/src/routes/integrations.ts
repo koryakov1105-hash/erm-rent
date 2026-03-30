@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { dbGet, dbInsert } from '../database/init';
 import { parseStatement, getFormatFromFilename, ParsedStatementRow } from '../integrations/bank/parseStatement';
+import { applyBankMatchRules } from '../lib/bankMatch';
 
 const router = express.Router();
 
@@ -64,6 +65,10 @@ router.post('/bank/upload', upload.single('file'), async (req: Request, res: Res
       const type = row.amount >= 0 ? 'income' : 'expense';
       const amount = Math.abs(row.amount);
       const description = [row.description, row.counterparty].filter(Boolean).join(' — ') || null;
+      const matched = applyBankMatchRules(
+        [row.description, row.counterparty].filter(Boolean).join(' ') || '',
+        row.counterparty || null
+      );
       const transaction = dbInsert('transactions', {
         type,
         amount,
@@ -74,13 +79,14 @@ router.post('/bank/upload', upload.single('file'), async (req: Request, res: Res
         status: 'paid',
         bank_account_id: bankAccountId,
         unit_id: null,
-        property_id: null,
+        property_id: matched.property_id,
         lease_id: null,
         category: null,
         category_detail: null,
         is_tenant_payment: 0,
         related_payment_id: null,
-        scheduled_pay_date: null
+        scheduled_pay_date: null,
+        ledger_account_id: matched.ledger_account_id,
       });
       created.push(transaction);
     }

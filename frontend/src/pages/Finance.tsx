@@ -9,6 +9,7 @@ import {
   leasesApi,
   bankAccountsApi,
   bankStatementsApi,
+  ledgerAccountsApi,
   Transaction,
   Unit,
   Property,
@@ -18,6 +19,7 @@ import {
   BankAccount,
   CalendarResponse,
   CalendarItem,
+  LedgerAccount,
 } from '../services/api';
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, UTILITY_SUBCATEGORIES } from '../constants/categories';
 
@@ -39,6 +41,7 @@ function Finance() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [ledgerAccounts, setLedgerAccounts] = useState<LedgerAccount[]>([]);
   const [showStatementModal, setShowStatementModal] = useState(false);
   const [statementFile, setStatementFile] = useState<File | null>(null);
   const [statementAccountId, setStatementAccountId] = useState<string>('');
@@ -52,6 +55,7 @@ function Finance() {
     unit_id: '',
     property_id: '',
     bank_account_id: '',
+    ledger_account_id: '',
     type: 'income' as 'income' | 'expense',
     category: '',
     category_detail: '',
@@ -63,6 +67,8 @@ function Finance() {
     is_tenant_payment: false,
     status: 'paid' as 'invoiced' | 'paid' | 'deferred',
     scheduled_pay_date: '',
+    vat_rate: '',
+    amount_excl_vat: '',
   });
   const [calendar, setCalendar] = useState<CalendarResponse | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -150,6 +156,16 @@ function Finance() {
     }
   };
 
+  const loadLedgerAccounts = async () => {
+    try {
+      const res = await ledgerAccountsApi.getAll();
+      setLedgerAccounts(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error(e);
+      setLedgerAccounts([]);
+    }
+  };
+
   useEffect(() => {
     loadUnits();
     loadProperties();
@@ -157,6 +173,7 @@ function Finance() {
     loadTenants();
     loadLeases();
     loadBankAccounts();
+    loadLedgerAccounts();
   }, []);
 
   useEffect(() => {
@@ -213,10 +230,15 @@ function Finance() {
         if (t.is_planned === 1) add(t.date, t, t.type === 'income' ? 'planned_income' : 'planned_expense');
         if (String(t.status) === 'deferred' && t.scheduled_pay_date) add(t.scheduled_pay_date, t, 'deferred');
       });
-      setCalendar({ by_date: byDate, dates: Object.keys(byDate).sort() });
+      setCalendar({
+        by_date: byDate,
+        dates: Object.keys(byDate).sort(),
+        opening_balance: 0,
+        cash_forecast: [],
+      });
     } catch (e) {
       console.error('Error loading calendar:', e);
-      setCalendar({ by_date: {}, dates: [] });
+      setCalendar({ by_date: {}, dates: [], opening_balance: 0, cash_forecast: [] });
     }
   };
 
@@ -232,6 +254,7 @@ function Finance() {
         unit_id: transaction.unit_id ? String(transaction.unit_id) : '',
         property_id: transaction.property_id ? String(transaction.property_id) : '',
         bank_account_id: transaction.bank_account_id != null ? String(transaction.bank_account_id) : '',
+        ledger_account_id: transaction.ledger_account_id != null ? String(transaction.ledger_account_id) : '',
         type: transaction.type,
         category: transaction.category || '',
         category_detail: transaction.category_detail || '',
@@ -243,6 +266,8 @@ function Finance() {
         is_tenant_payment: transaction.is_tenant_payment === 1,
         status: (String(transaction.status) === 'deferred' ? 'deferred' : String(transaction.status) === 'invoiced' ? 'invoiced' : 'paid') as 'invoiced' | 'paid' | 'deferred',
         scheduled_pay_date: transaction.scheduled_pay_date ? (String(transaction.scheduled_pay_date).split('T')[0] || '') : '',
+        vat_rate: transaction.vat_rate != null ? String(transaction.vat_rate) : '',
+        amount_excl_vat: transaction.amount_excl_vat != null ? String(transaction.amount_excl_vat) : '',
       });
     } else {
       setEditingTransaction(null);
@@ -250,6 +275,7 @@ function Finance() {
         unit_id: '',
         property_id: '',
         bank_account_id: '',
+        ledger_account_id: '',
         type: 'income',
         category: '',
         category_detail: '',
@@ -261,6 +287,8 @@ function Finance() {
         is_tenant_payment: false,
         status: 'paid',
         scheduled_pay_date: '',
+        vat_rate: '',
+        amount_excl_vat: '',
       });
     }
     setShowModal(true);
@@ -281,6 +309,7 @@ function Finance() {
         unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
         property_id: formData.property_id ? parseInt(formData.property_id) : null,
         bank_account_id: formData.bank_account_id ? parseInt(formData.bank_account_id) : null,
+        ledger_account_id: formData.ledger_account_id ? parseInt(formData.ledger_account_id, 10) : null,
         type: formData.type,
         category: formData.category || undefined,
         category_detail: formData.category_detail || undefined,
@@ -291,6 +320,8 @@ function Finance() {
         is_planned: formData.is_planned ? 1 : 0,
         is_tenant_payment: formData.is_tenant_payment ? 1 : 0,
         status: paymentStatus,
+        vat_rate: formData.vat_rate ? parseFloat(String(formData.vat_rate).replace(',', '.')) : null,
+        amount_excl_vat: formData.amount_excl_vat ? parseFloat(String(formData.amount_excl_vat).replace(',', '.')) : null,
       };
       if (paymentStatus === 'deferred' && formData.scheduled_pay_date) {
         payload.scheduled_pay_date = formData.scheduled_pay_date;
@@ -475,7 +506,7 @@ function Finance() {
           <h2 className="card-title" style={{ margin: 0, fontSize: '1.25rem' }}>Платёжный календарь</h2>
         </div>
         <p className="finance-intro" style={{ marginBottom: '0.75rem' }}>
-          План приходов и расходов по датам. Отображаются плановые платежи и отложенные (с датой «когда оплатить»).
+          План приходов и расходов по датам. Отображаются плановые платежи и отложенные (с датой «когда оплатить»). Ниже — прогностический остаток по плану (входящий остаток считается по фактическим операциям до начала месяца).
         </p>
         <div className="finance-filters" style={{ marginBottom: '1rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -524,6 +555,38 @@ function Finance() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {calendar?.cash_forecast && calendar.cash_forecast.length > 0 && (
+          <div style={{ marginTop: '1.25rem' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Прогноз остатка (план + отложенные)</h3>
+            <p className="text-secondary" style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              Входящий остаток на {calendarMonth}-01: {(calendar.opening_balance ?? 0).toLocaleString('ru-RU')} ₽. Отрицательный прогноз — возможный кассовый разрыв.
+            </p>
+            <div className="finance-table-wrap" style={{ maxHeight: 280, overflow: 'auto' }}>
+              <table className="table finance-table">
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Приток</th>
+                    <th>Отток</th>
+                    <th>Чистый</th>
+                    <th>Остаток</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calendar.cash_forecast.map((row) => (
+                    <tr key={row.date} style={row.balance_cumulative < 0 ? { background: 'rgba(198, 40, 40, 0.08)' } : undefined}>
+                      <td>{new Date(row.date).toLocaleDateString('ru-RU')}</td>
+                      <td>{row.inflow.toLocaleString('ru-RU')}</td>
+                      <td>{row.outflow.toLocaleString('ru-RU')}</td>
+                      <td>{row.net.toLocaleString('ru-RU')}</td>
+                      <td style={{ fontWeight: 600 }}>{row.balance_cumulative.toLocaleString('ru-RU')} ₽</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -965,6 +1028,45 @@ function Finance() {
                     <option key={a.id} value={a.id}>{a.name} — {a.account_number}</option>
                   ))}
                 </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Счёт учёта (ДДС / ОПиУ)</label>
+                <select
+                  className="form-input"
+                  value={formData.ledger_account_id}
+                  onChange={(e) => setFormData({ ...formData, ledger_account_id: e.target.value })}
+                >
+                  <option value="">— По категории (авто)</option>
+                  {ledgerAccounts
+                    .filter((a) => a.kind === formData.type)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>{a.code} {a.name}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Ставка НДС, %</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-input"
+                  value={formData.vat_rate}
+                  onChange={(e) => setFormData({ ...formData, vat_rate: e.target.value })}
+                  placeholder="напр. 20"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Сумма без НДС, ₽</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-input"
+                  value={formData.amount_excl_vat}
+                  onChange={(e) => setFormData({ ...formData, amount_excl_vat: e.target.value })}
+                  placeholder="опционально"
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Статус оплаты</label>

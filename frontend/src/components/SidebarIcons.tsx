@@ -56,4 +56,28 @@ export const SidebarIcons = {
       <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  reports: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 3H16V17H4V3Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path d="M7 7H13M7 11H13M7 15H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  budget: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="4" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path d="M7 8V14M11 6V14M15 10V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  paymentRequest: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 6H16M4 10H12M4 14H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="15" cy="6" r="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+    </svg>
+  ),
+  bankRules: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 8L10 4L16 8V16H4V8Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path d="M8 16V11H12V16" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+    </svg>
+  ),
 };

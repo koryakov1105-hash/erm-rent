@@ -7,6 +7,10 @@ const PATH_LABELS: Record<string, string> = {
   tenants: 'Арендаторы',
   leases: 'Договоры',
   finance: 'Финансы',
+  reports: 'Отчёты',
+  budgets: 'Бюджеты',
+  'payment-requests': 'Заявки на оплату',
+  'bank-rules': 'Правила банка',
   profile: 'Профиль пользователя',
   settings: 'Профиль пользователя',
 };

@@ -17,6 +17,14 @@ import addressSuggestRoutes from './routes/address-suggest';
 import invoicesRoutes from './routes/invoices';
 import bankAccountsRoutes from './routes/bank-accounts';
 import integrationsRoutes from './routes/integrations';
+import { optionalAuthMiddleware } from './middleware/auth';
+import ledgerAccountsRoutes from './routes/ledger-accounts';
+import reportsRoutes from './routes/reports';
+import insightsRoutes from './routes/insights';
+import budgetsRoutes from './routes/budgets';
+import paymentRequestsRoutes from './routes/payment-requests';
+import bankMatchRulesRoutes from './routes/bank-match-rules';
+import auditLogRoutes from './routes/audit-log';
 
 dotenv.config();
 
@@ -26,6 +34,7 @@ const PORT = process.env.PORT || 3002;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/api', optionalAuthMiddleware);
 
 // Content Security Policy для защиты от нежелательных внешних скриптов
 app.use((req, res, next) => {
@@ -54,6 +63,13 @@ app.use('/api/address-suggest', addressSuggestRoutes);
 app.use('/api/invoices', invoicesRoutes);
 app.use('/api/bank-accounts', bankAccountsRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/ledger-accounts', ledgerAccountsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/insights', insightsRoutes);
+app.use('/api/budgets', budgetsRoutes);
+app.use('/api/payment-requests', paymentRequestsRoutes);
+app.use('/api/bank-match-rules', bankMatchRulesRoutes);
+app.use('/api/audit-log', auditLogRoutes);
 
 // В production: раздача собранного фронта из backend/public (если папка есть)
 const publicDir = path.join(__dirname, '..', 'public');

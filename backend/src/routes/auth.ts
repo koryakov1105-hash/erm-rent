@@ -59,6 +59,7 @@ router.post('/register', async (req: Request, res: Response) => {
         password_hash: passwordHash,
         name: (name && String(name).trim()) || emailNorm,
         is_first: isFirst,
+        role: isFirst ? 'admin' : 'operator',
         created_at: new Date().toISOString()
       });
     } catch (e) {
@@ -84,7 +85,8 @@ router.post('/register', async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        is_first: user.is_first
+        is_first: user.is_first,
+        role: user.role || 'operator',
       }
     });
   } catch (error: any) {
@@ -146,7 +148,8 @@ router.post('/login', async (req: Request, res: Response) => {
         id: user.id,
         email: user.email ?? emailNorm,
         name: user.name ?? emailNorm,
-        is_first: user.is_first
+        is_first: user.is_first,
+        role: user.role || 'operator',
       }
     });
   } catch (err: unknown) {
@@ -197,7 +200,8 @@ router.get('/me', (req: Request, res: Response) => {
       id: user.id,
       email: user.email,
       name: user.name,
-      is_first: user.is_first
+      is_first: user.is_first,
+      role: user.role || 'operator',
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

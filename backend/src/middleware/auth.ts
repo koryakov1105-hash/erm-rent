@@ -7,6 +7,20 @@ export interface AuthRequest extends Request {
   userId?: number;
 }
 
+/** Пробует проставить userId из JWT; не возвращает 401. */
+export function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return next();
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    req.userId = decoded.userId;
+  } catch {
+    /* нет пользователя */
+  }
+  next();
+}
+
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;

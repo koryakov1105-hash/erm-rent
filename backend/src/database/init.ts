@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { DEFAULT_LEDGER_TEMPLATES } from '../lib/ledgerDefaults';
 
 // Путь к БД: из env, иначе папка в temp (всегда доступна для записи)
 function getDefaultDbPath(): string {
@@ -22,6 +23,12 @@ interface DatabaseData {
   transactions: any[];
   property_documents: any[];
   bank_accounts: any[];
+  ledger_accounts: any[];
+  budgets: any[];
+  budget_lines: any[];
+  audit_log: any[];
+  payment_requests: any[];
+  bank_match_rules: any[];
 }
 
 let data: DatabaseData = {
@@ -35,7 +42,13 @@ let data: DatabaseData = {
   tenant_payments: [],
   transactions: [],
   property_documents: [],
-  bank_accounts: []
+  bank_accounts: [],
+  ledger_accounts: [],
+  budgets: [],
+  budget_lines: [],
+  audit_log: [],
+  payment_requests: [],
+  bank_match_rules: [],
 };
 
 // Ensure database directory exists
@@ -63,14 +76,21 @@ function loadData(): void {
       tenant_payments: [],
       transactions: [],
       property_documents: [],
-      bank_accounts: []
+      bank_accounts: [],
+      ledger_accounts: [],
+      budgets: [],
+      budget_lines: [],
+      audit_log: [],
+      payment_requests: [],
+      bank_match_rules: [],
     };
   }
   // Ensure every table is an array (avoid 500 when JSON has wrong shape)
   const tables: (keyof DatabaseData)[] = [
     'users', 'properties', 'units', 'tenants', 'leases',
     'mandatory_payments', 'actual_mandatory_payments', 'tenant_payments', 'transactions',
-    'property_documents', 'bank_accounts'
+    'property_documents', 'bank_accounts', 'ledger_accounts', 'budgets', 'budget_lines',
+    'audit_log', 'payment_requests', 'bank_match_rules',
   ];
   for (const key of tables) {
     if (!Array.isArray((data as any)[key])) {
@@ -87,9 +107,49 @@ function saveData(): void {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+function ensureLedgerAccountsAndUserRoles(): void {
+  const raw = (data as any).ledger_accounts;
+  const ledgerArr = Array.isArray(raw) ? raw : [];
+  if (ledgerArr.length === 0) {
+    let id = 1;
+    for (const t of DEFAULT_LEDGER_TEMPLATES) {
+      ledgerArr.push({
+        id: id++,
+        code: t.code,
+        name: t.name,
+        kind: t.kind,
+        cfs_activity: t.cfs_activity,
+        pl_group: t.pl_group,
+        mapped_categories: t.mapped_categories,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+    (data as any).ledger_accounts = ledgerArr;
+    saveData();
+  }
+
+  const users = Array.isArray((data as any).users) ? (data as any).users : [];
+  const numericIds = users.filter((u: any) => u && typeof u.id === 'number').map((u: any) => u.id);
+  const minUserId = numericIds.length ? Math.min(...numericIds) : null;
+  let changed = false;
+  for (const u of users) {
+    if (u && (u.role === undefined || u.role === null || u.role === '')) {
+      const explicitFirst = u.is_first === true || u.is_first === 1;
+      u.role = explicitFirst || (minUserId != null && u.id === minUserId) ? 'admin' : 'operator';
+      changed = true;
+    }
+  }
+  if (changed) {
+    (data as any).users = users;
+    saveData();
+  }
+}
+
 // Initialize database
 export function initializeDatabase(): void {
   loadData();
+  ensureLedgerAccountsAndUserRoles();
   console.log('✅ Database initialized (JSON storage)');
   console.log('   DB file:', DATA_FILE);
 }

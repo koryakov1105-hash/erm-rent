@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { propertiesApi, unitsApi, tenantPaymentsApi, transactionsApi, leasesApi, Property, Unit, Transaction } from '../services/api';
+import { propertiesApi, unitsApi, tenantPaymentsApi, transactionsApi, leasesApi, insightsApi, Property, Unit, Transaction } from '../services/api';
 
 type MonthData = { month: string; monthShort: string; income: number; expense: number; profit: number };
 
@@ -9,6 +9,7 @@ const DASHBOARD_LAYOUT_KEY = 'dashboard-layout';
 const DASHBOARD_WIDGET_SIZES_KEY = 'dashboard-widget-sizes';
 const DEFAULT_WIDGET_ORDER = [
   'overview',
+  'risks',
   'notifications',
   'quick-actions',
   'mandatory-payments',
@@ -19,7 +20,7 @@ const DEFAULT_WIDGET_ORDER = [
   'analytics',
 ];
 /** Виджеты, которые по умолчанию в сетке занимают 2 колонки (широкие) */
-const WIDGET_SPAN_2 = new Set(['overview', 'notifications', 'mandatory-payments', 'tenant-payments', 'analytics']);
+const WIDGET_SPAN_2 = new Set(['overview', 'risks', 'notifications', 'mandatory-payments', 'tenant-payments', 'analytics']);
 
 type WidgetSize = { colSpan: number; rowSpan: number };
 function getDefaultWidgetSize(id: string): WidgetSize {
@@ -108,6 +109,8 @@ function Dashboard() {
   const [plannedPaymentsCount, setPlannedPaymentsCount] = useState(0);
   const [plannedPaymentsSum, setPlannedPaymentsSum] = useState(0);
   const [leasesEndingSoon, setLeasesEndingSoon] = useState<any[]>([]);
+  const [insightAlerts, setInsightAlerts] = useState<{ level: string; message: string }[]>([]);
+  const [deviations, setDeviations] = useState<Record<string, number | null> | null>(null);
   const [chartMonths, setChartMonths] = useState(6);
   const [payMonth, setPayMonth] = useState(new Date().getMonth() + 1);
   const [payYear, setPayYear] = useState(new Date().getFullYear());
@@ -155,6 +158,19 @@ function Dashboard() {
 
   useEffect(() => {
     loadNotifications();
+  }, []);
+
+  useEffect(() => {
+    insightsApi
+      .get()
+      .then((res) => {
+        setInsightAlerts(Array.isArray(res.data?.alerts) ? res.data.alerts.slice(0, 12) : []);
+        setDeviations(res.data?.deviations && typeof res.data.deviations === 'object' ? res.data.deviations : null);
+      })
+      .catch(() => {
+        setInsightAlerts([]);
+        setDeviations(null);
+      });
   }, []);
 
   useEffect(() => {
@@ -546,6 +562,54 @@ function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+              )}
+              {id === 'risks' && (
+      <div className="card">
+        <h2 className="card-title">Риски и отклонения план/факт</h2>
+        {insightAlerts.length > 0 ? (
+          <ul className="notifications-list" style={{ marginBottom: '1rem' }}>
+            {insightAlerts.map((a, idx) => (
+              <li key={idx}>
+                <span className={`notif-dot ${a.level === 'danger' ? 'notif-warn' : a.level === 'warning' ? 'notif-plan' : 'notif-info'}`} />
+                {a.message}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-secondary" style={{ marginBottom: '1rem' }}>Нет критических сигналов по текущим данным.</p>
+        )}
+        {deviations && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', fontSize: '0.9rem' }}>
+            <div className="card" style={{ padding: '0.75rem', margin: 0 }}>
+              <div className="text-secondary">План доход</div>
+              <strong>{(deviations.planned_income ?? 0).toLocaleString('ru-RU')} ₽</strong>
+            </div>
+            <div className="card" style={{ padding: '0.75rem', margin: 0 }}>
+              <div className="text-secondary">Факт доход</div>
+              <strong>{(deviations.actual_income ?? 0).toLocaleString('ru-RU')} ₽</strong>
+            </div>
+            <div className="card" style={{ padding: '0.75rem', margin: 0 }}>
+              <div className="text-secondary">План расход</div>
+              <strong>{(deviations.planned_expense ?? 0).toLocaleString('ru-RU')} ₽</strong>
+            </div>
+            <div className="card" style={{ padding: '0.75rem', margin: 0 }}>
+              <div className="text-secondary">Факт расход</div>
+              <strong>{(deviations.actual_expense ?? 0).toLocaleString('ru-RU')} ₽</strong>
+            </div>
+            {deviations.income_gap_pct != null && (
+              <div className="card" style={{ padding: '0.75rem', margin: 0 }}>
+                <div className="text-secondary">Отклонение дохода</div>
+                <strong>{deviations.income_gap_pct}%</strong>
+              </div>
+            )}
+          </div>
+        )}
+        <p style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+          <Link to="/reports">Отчёты ДДС и ОПиУ</Link>
+          {' · '}
+          <Link to="/finance">Платёжный календарь</Link>
+        </p>
       </div>
               )}
               {id === 'notifications' && (

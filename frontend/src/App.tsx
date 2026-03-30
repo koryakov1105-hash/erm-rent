@@ -19,6 +19,10 @@ const Tenants = lazy(() => import('./pages/Tenants'));
 const Leases = lazy(() => import('./pages/Leases'));
 const Finance = lazy(() => import('./pages/Finance'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Budgets = lazy(() => import('./pages/Budgets'));
+const PaymentRequestsPage = lazy(() => import('./pages/PaymentRequests'));
+const BankRules = lazy(() => import('./pages/BankRules'));
 
 function PageFallback() {
   return (
@@ -131,6 +135,10 @@ function AppLayout() {
             </div>
           )}
           <SidebarLink to="/finance" icon={SidebarIcons.finance}>Финансы и платежи</SidebarLink>
+          <SidebarLink to="/reports" icon={SidebarIcons.reports}>Отчёты</SidebarLink>
+          <SidebarLink to="/budgets" icon={SidebarIcons.budget}>Бюджеты</SidebarLink>
+          <SidebarLink to="/payment-requests" icon={SidebarIcons.paymentRequest}>Заявки на оплату</SidebarLink>
+          <SidebarLink to="/bank-rules" icon={SidebarIcons.bankRules}>Правила банка</SidebarLink>
         </nav>
         <div className="sidebar-footer">
           <SidebarLink to="/profile" icon={SidebarIcons.profile}>Профиль пользователя</SidebarLink>
@@ -151,6 +159,10 @@ function AppLayout() {
               <Route path="/leases" element={<Leases />} />
               <Route path="/payments" element={<Navigate to="/finance" replace />} />
               <Route path="/finance" element={<Finance />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/budgets" element={<Budgets />} />
+              <Route path="/payment-requests" element={<PaymentRequestsPage />} />
+              <Route path="/bank-rules" element={<BankRules />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Navigate to="/profile" replace />} />
             </Routes>
